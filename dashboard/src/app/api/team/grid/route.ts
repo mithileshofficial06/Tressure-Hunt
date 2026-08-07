@@ -11,9 +11,9 @@ import { findTeam, isConfigured, markRoundSolved, recomputeCompletion } from "@/
  * the player typed and knows nothing else; the comparison happens here against
  * a server-only module, so there is no answer in the client bundle to read.
  *
- * THE TEAM NUMBER COMES FROM THE COOKIE, NEVER THE BODY — the same rule as
- * `/api/team/progress`. Taking it from the request would let one team clear the
- * round for another by changing a field.
+ * THE TEAM NUMBER COMES FROM THE COOKIE, NEVER THE BODY — the same rule every
+ * scoring route follows. Taking it from the request would let one team clear
+ * the round for another by changing a field.
  *
  * A correct answer stamps `hunt-grid` directly rather than asking the team to
  * tick it: the server just verified it, so making them confirm would be asking

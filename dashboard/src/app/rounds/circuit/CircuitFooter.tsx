@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatDuration } from "@/lib/format";
 
 /**
@@ -22,6 +23,16 @@ import { formatDuration } from "@/lib/format";
  * server has stamped the `circuit-1` round — five verified boards — not
  * anything the browser worked out for itself. A team on level 4 cannot use this
  * to bank a round they have not finished.
+ *
+ * `autoOpen` opens the same dialogue by itself the moment that stamp arrives, so
+ * finishing the fifth circuit ends in the points rather than in a button the
+ * player has to go looking for in a 46px bar.
+ *
+ * THE DIALOGUE IS PORTALLED TO `document.body`, and it has to be. This component
+ * renders inside `.oc-bar`, which sets `backdrop-filter` — that makes the bar
+ * the containing block for `position: fixed` descendants, so `.oc-overlay`'s
+ * `inset: 0` resolved against a 46px-tall strip and the bar's `overflow-x: auto`
+ * scrolled what was left. The summary was rendering, squeezed into the bar.
  */
 
 interface Summary {
@@ -39,7 +50,13 @@ interface Summary {
    definition means the circuit's finish card and the hunt board can never
    disagree about how long a team has been playing. */
 
-export default function CircuitFooter({ solved }: { solved: boolean }) {
+export default function CircuitFooter({
+  solved,
+  autoOpen = false,
+}: {
+  solved: boolean;
+  autoOpen?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -56,7 +73,7 @@ export default function CircuitFooter({ solved }: { solved: boolean }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [open, close]);
 
-  async function finish() {
+  const finish = useCallback(async () => {
     if (!solved) return;
     setOpen(true);
     setLoading(true);
@@ -74,7 +91,16 @@ export default function CircuitFooter({ solved }: { solved: boolean }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [solved]);
+
+  // Once, on the transition into a finished round. Not on every render where
+  // `autoOpen` happens to still be true, or dismissing it would be impossible.
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!autoOpen || !solved || autoOpenedRef.current) return;
+    autoOpenedRef.current = true;
+    void finish();
+  }, [autoOpen, solved, finish]);
 
   const mine = summary?.rounds.find((r) => r.slug === "circuit-1") ?? null;
   const finishedHunt = summary?.totalMs != null;
@@ -98,14 +124,20 @@ export default function CircuitFooter({ solved }: { solved: boolean }) {
         )}
       </div>
 
-      {open && (
-        <div
-          className="oc-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) close();
-          }}
-        >
-          <div role="dialog" aria-modal="true" aria-labelledby="oc-finish-title" className="oc-dialog">
+      {open &&
+        createPortal(
+          <div
+            className="oc-overlay"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) close();
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="oc-finish-title"
+              className="oc-dialog"
+            >
             {loading ? (
               <p className="oc-dialog__muted">Reading your progress…</p>
             ) : error ? (
@@ -126,6 +158,7 @@ export default function CircuitFooter({ solved }: { solved: boolean }) {
                 <h2 id="oc-finish-title" className="oc-dialog__title">
                   Octavius Circuit
                 </h2>
+                <p className="oc-dialog__lead">All five circuits complete.</p>
 
                 <div className="oc-dialog__points">
                   <span>Points this round</span>
@@ -164,9 +197,10 @@ export default function CircuitFooter({ solved }: { solved: boolean }) {
                 </button>
               </>
             ) : null}
-          </div>
-        </div>
-      )}
+            </div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }

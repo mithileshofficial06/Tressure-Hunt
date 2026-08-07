@@ -19,7 +19,7 @@ import { findPuzzle, updatePuzzle } from "@/lib/shiftverse/teams";
  * segment. There is nothing to edit now.
  *
  * The path is `/api/shiftverse/*` rather than `/api/team/*`. The dashboard
- * already owns `/api/team/claim`, `/api/team/progress`, `/api/team/summary` and
+ * already owns `/api/team/claim`, `/api/team/summary`, `/api/team/grid` and
  * more; adding a `[teamNumber]` dynamic segment beside them would have left the
  * routing to a precedence rule (static beats dynamic) that is easy to break by
  * accident and hard to notice when it breaks.

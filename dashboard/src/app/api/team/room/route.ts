@@ -13,8 +13,8 @@ import { findTeam, isConfigured, markRoundSolved, recomputeCompletion } from "@/
  * route is for is making the SERVER the thing that stamps the round.
  *
  * THE TEAM NUMBER COMES FROM THE COOKIE, NEVER THE BODY — the same rule as
- * `/api/team/grid` and `/api/team/progress`. Taking it from the request would
- * let one team clear the round for another by changing a field.
+ * `/api/team/grid` and every other scoring route. Taking it from the request
+ * would let one team clear the round for another by changing a field.
  *
  * A correct code stamps `hunt-room` directly rather than asking the team to
  * tick it, for the same reason the grid does: the server just verified it, so

@@ -61,6 +61,11 @@ export default function CircuitGame({
   const [roundComplete, setRoundComplete] = useState(
     initialSolved.length >= totalLevels && totalLevels > 0
   );
+  // Distinct from `roundComplete`, which is also true for a team that walks back
+  // into a round it already finished. The summary should pop at the moment the
+  // fifth circuit lands — not in the face of someone who came back to look at
+  // the board.
+  const [justCompleted, setJustCompleted] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,7 +105,10 @@ export default function CircuitGame({
                 : null
             );
             if (result?.solvedLevels) setSolved(result.solvedLevels);
-            if (result?.roundComplete) setRoundComplete(true);
+            if (result?.roundComplete) {
+              setRoundComplete(true);
+              setJustCompleted(true);
+            }
           },
         });
       } catch (err) {
@@ -133,7 +141,7 @@ export default function CircuitGame({
           </span>
         </div>
 
-        <CircuitFooter solved={roundComplete} />
+        <CircuitFooter solved={roundComplete} autoOpen={justCompleted} />
       </div>
 
       {roundComplete && (
@@ -240,8 +248,14 @@ export default function CircuitGame({
             <p className="win-subtitle">
               Voltage Matched — <span id="win-voltage" />
             </p>
+            {/* Only ever seen on the last level, and only if the submit didn't
+                land — normally the round summary replaces this card entirely.
+                `ui.showWin` toggles both this and the button. */}
+            <p id="win-final-hint" className="win-subtitle" style={{ display: "none" }}>
+              Use FINISH ROUND at the top of the screen to bank it.
+            </p>
             <button id="btn-play-again" className="win-btn">
-              PLAY AGAIN
+              NEXT LEVEL ➜
             </button>
           </div>
         </div>

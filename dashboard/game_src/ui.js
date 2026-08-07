@@ -171,15 +171,46 @@ export class UI {
     }
   }
 
+  /**
+   * `hasNextLevel === false` means the fifth circuit is done, and there is
+   * deliberately NO button on that card.
+   *
+   * It used to say PLAY AGAIN, which was the wrong offer twice over: the round
+   * is banked on the server the moment the board verifies, so replaying it
+   * changes nothing, and it read as the way forward when the actual way forward
+   * is the round summary the dashboard pops over the top of this.
+   *
+   * The card only survives on the last level when the submit failed — otherwise
+   * `main.js` cancels it — so it also tells the player where to go, and can be
+   * clicked away rather than trapping them behind a modal with no exit.
+   */
   showWin(voltage, hasNextLevel = false) {
-    if (this.winOverlay) {
-      this.winOverlay.classList.remove('hidden');
-      if (this.winVoltage) this.winVoltage.textContent = `${voltage}V`;
-      if (this.playAgainBtn) {
-        this.playAgainBtn.textContent = hasNextLevel ? 'NEXT LEVEL ➜' : 'PLAY AGAIN';
-      }
-      this._spawnWinParticles();
+    if (!this.winOverlay) return;
+
+    this.winOverlay.classList.remove('hidden');
+    if (this.winVoltage) this.winVoltage.textContent = `${voltage}V`;
+
+    const title = this.winOverlay.querySelector('.win-title');
+    const hint = document.getElementById('win-final-hint');
+
+    if (this.playAgainBtn) {
+      this.playAgainBtn.textContent = 'NEXT LEVEL ➜';
+      this.playAgainBtn.style.display = hasNextLevel ? '' : 'none';
     }
+    if (title) {
+      title.textContent = hasNextLevel ? 'CIRCUIT COMPLETE!' : 'ALL CIRCUITS COMPLETE!';
+    }
+    if (hint) hint.style.display = hasNextLevel ? 'none' : '';
+
+    // Dismissable on the final card only: with no button there has to be some
+    // way back to the board.
+    this.winOverlay.onpointerdown = hasNextLevel
+      ? null
+      : (e) => {
+          if (e.target === this.winOverlay) this.hideWin();
+        };
+
+    this._spawnWinParticles();
   }
 
   hideWin() {

@@ -18,9 +18,22 @@ export interface SolvedRound {
 /**
  * The five rounds, for one registered team.
  *
- * Each tile can be stamped done, and the stamp is one-way from here: there is
- * no "undo" button because a team that can rewind its own clock can rewrite its
- * own finish time. Corrections are a coordinator's job on the admin board.
+ * THIS BOARD IS READ-ONLY. It reports what the server has stamped; it cannot
+ * stamp anything itself.
+ *
+ * There used to be a "Mark complete" button on every unsolved tile, calling
+ * `POST /api/team/progress`. It was a hole: all five rounds already stamp
+ * themselves the moment the server verifies a real solve — the circuit on its
+ * fifth board, the grid and the room on their answers, Shift Verse on its
+ * guess, the blueprint on its final checkpoint — so the button's only remaining
+ * power was to credit a round a team had NOT played. Five taps finished the
+ * hunt without opening a puzzle, and the resulting row was indistinguishable
+ * from an honest one apart from a `markedBy` of "team".
+ *
+ * Corrections are a coordinator's job on the admin board (`/api/admin/progress`,
+ * which is the only route that still writes a stamp on request). The endpoint
+ * behind the old button is gone, not merely unlinked — hiding a button that a
+ * `curl` could still reach would have been decoration.
  *
  * The running clock ticks client-side from `registeredAt` rather than being
  * pushed from the server, so it stays smooth without a request per second. Once
@@ -47,12 +60,15 @@ export default function Dashboard({
   degraded: boolean;
 }) {
   const [open, setOpen] = useState<string | null>(null);
-  const [solved, setSolved] = useState<SolvedRound[]>(initialSolved);
-  const [completedAt, setCompletedAt] = useState(initialCompletedAt);
-  const [durationMs, setDurationMs] = useState(initialDurationMs);
-  const [pending, setPending] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState<number | null>(null);
+
+  /* Straight from the server render. These were `useState` setters when the
+     board could stamp a round and had to fold the response back in; with the
+     button gone nothing on this page mutates them, and a reload is what shows
+     a newly-cleared round. */
+  const solved = initialSolved;
+  const completedAt = initialCompletedAt;
+  const durationMs = initialDurationMs;
 
   const byslug = new Map(solved.map((s) => [s.slug, s]));
   const finished = completedAt !== null;
@@ -72,36 +88,6 @@ export default function Dashboard({
 
   const runningMs =
     finished || !registeredAt || now === null ? durationMs : elapsedSince(registeredAt, now);
-
-  async function markDone(slug: string) {
-    if (pending || byslug.has(slug)) return;
-    setPending(slug);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/team/progress", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ slug }),
-      });
-      const body = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setError(body.error ?? "Couldn't save that. Try again.");
-        return;
-      }
-
-      // Trust the server's list wholesale rather than patching local state:
-      // it also carries any admin override that landed since this page loaded.
-      setSolved(body.solved ?? []);
-      setCompletedAt(body.completedAt ?? null);
-      setDurationMs(body.durationMs ?? null);
-    } catch {
-      setError("Couldn't reach the server — check your connection.");
-    } finally {
-      setPending(null);
-    }
-  }
 
   async function signOut() {
     await fetch("/api/team/logout", { method: "POST" });
@@ -167,7 +153,6 @@ export default function Dashboard({
             Couldn&apos;t read progress — rounds may show as unsolved.
           </p>
         )}
-        {error && <p className="anim-rise mt-4 font-mono text-xs text-bad">{error}</p>}
 
         {/* ── Round list ────────────────────────────────────────────────── */}
         <h2 className="label mt-10">Rounds</h2>
@@ -236,17 +221,7 @@ export default function Dashboard({
                           </a>
                         )}
 
-                        {isSolved ? (
-                          <span className="tag tag-good">Complete</span>
-                        ) : (
-                          <button
-                            onClick={() => void markDone(e.slug)}
-                            disabled={pending !== null}
-                            className="btn"
-                          >
-                            {pending === e.slug ? "Saving…" : "Mark complete"}
-                          </button>
-                        )}
+                        {isSolved && <span className="tag tag-good">Complete</span>}
 
                         <span className="ml-auto font-mono text-[0.7rem] text-ink-3">
                           {e.slug}
@@ -255,7 +230,9 @@ export default function Dashboard({
 
                       {!isSolved && (
                         <p className="mt-3 font-mono text-[0.7rem] text-ink-3">
-                          Marking is final — ask a coordinator to undo a mistake.
+                          This round marks itself the moment the server verifies your
+                          answer — there is nothing to tick off here. If it stays
+                          unsolved after you have finished it, ask a coordinator.
                         </p>
                       )}
                     </div>

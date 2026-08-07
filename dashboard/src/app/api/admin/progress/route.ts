@@ -14,9 +14,11 @@ import { parseTeamNumber } from "@/lib/teamNumber";
 /**
  * POST /api/admin/progress — the override.
  *
- * `{ teamNumber, slug, solved: boolean }`. This is the only endpoint that can
- * un-solve a round: teams can stamp their own progress but never take it back,
- * because "undo" in a participant's hands is how a finish time quietly moves.
+ * `{ teamNumber, slug, solved: boolean }`. This is the only endpoint that
+ * stamps a round ON REQUEST, in either direction. Everywhere else a stamp is a
+ * side effect of the server verifying a real solve, and nothing a team sends
+ * can ask for one — `/api/team/progress`, which let a team mark its own tiles
+ * from the board, is gone. See the note in `dashboard/Dashboard.tsx`.
  *
  * Returns the full refreshed board rather than an ack, so the coordinator's
  * table reflects the override immediately instead of waiting out the poll

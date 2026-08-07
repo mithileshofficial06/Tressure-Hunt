@@ -36,6 +36,7 @@ let gameWon       = false;
 
 let board = null;
 let inventory = null;
+let winTimer = null;   // pending showWin, cancellable if the round ends first
 
 // ── Init Modules ──────────────────────────
 const bgRenderer = new BackgroundRenderer('bg-canvas', 'bg-video');
@@ -217,11 +218,24 @@ function updateCircuit() {
       body: JSON.stringify({ levelId: level.id, pieces })
     })
       .then((res) => res.json())
-      .then((body) => onProgress(body))
+      .then((body) => {
+        onProgress(body);
+
+        // THE LAST LEVEL ENDS IN THE ROUND SUMMARY, NOT IN THIS CARD.
+        //
+        // Once the server says the round is complete the wrapper pops the
+        // points / go-to-hunt dialogue, so the game's own win card would be a
+        // second modal stacked behind it with nothing useful on it. Cancel it
+        // if it has not appeared yet, and take it down if it already has.
+        if (body?.roundComplete) {
+          clearTimeout(winTimer);
+          ui.hideWin();
+        }
+      })
       .catch(console.error);
 
     const hasNext = currentLevelIndex < LEVELS.length - 1;
-    setTimeout(() => ui.showWin(result.voltage, hasNext), 800);
+    winTimer = setTimeout(() => ui.showWin(result.voltage, hasNext), 800);
   }
 }
 

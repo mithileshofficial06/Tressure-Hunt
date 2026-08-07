@@ -25,10 +25,36 @@
  */
 
 /**
- * Fixed formatting locale. NOT the reader's timezone — that still comes from
- * the runtime. Do not replace this with `[]` or `undefined`; see above.
+ * Fixed formatting locale. Do not replace this with `[]` or `undefined`.
  */
 const LOCALE = "en-GB";
+
+/**
+ * THE EVENT'S TIMEZONE. Pinned, and it has to be.
+ *
+ * Pinning the locale alone was not enough, and the reason only showed up in
+ * production. `toLocaleTimeString` formats in the RUNTIME's timezone, and these
+ * functions run twice — once during SSR, once on hydration:
+ *
+ *   Vercel (server) runs in UTC   → 13:37:13
+ *   A phone at the venue (client) → 19:07:13   (IST, +5:30)
+ *
+ * Not a formatting difference — a five-and-a-half-hour one. React saw different
+ * text and threw a hydration error on the admin board (React #418). Locally it
+ * never appeared, because there the server and the browser are both IST and
+ * only the am/pm casing disagreed.
+ *
+ * So the timezone is stated rather than inherited. Both renders now agree, and
+ * every screen shows VENUE time regardless of where it was rendered or who is
+ * reading — which is what a coordinator comparing a wall clock to a finish time
+ * actually needs. A team abroad watching a livestream would see venue time too;
+ * that is correct for a hunt, not a bug.
+ *
+ * Override with `NEXT_PUBLIC_EVENT_TZ` if the event ever moves. It must be
+ * NEXT_PUBLIC_ so the browser reads the SAME value the server did — a
+ * server-only variable here would reintroduce exactly this bug.
+ */
+const TZ = process.env.NEXT_PUBLIC_EVENT_TZ || "Asia/Kolkata";
 
 /** "1h 23m 45s" — always at least a seconds part, so 0 renders as "0s". */
 export function formatDuration(ms: number | null): string {
@@ -56,6 +82,7 @@ export function formatClock(iso: string | null): string {
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
+    timeZone: TZ,
   });
 }
 
@@ -70,7 +97,7 @@ export function formatStamp(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString(LOCALE, { hour12: false });
+  return d.toLocaleString(LOCALE, { hour12: false, timeZone: TZ });
 }
 
 /** Elapsed since a start time — drives the live "running" clock on the board. */
