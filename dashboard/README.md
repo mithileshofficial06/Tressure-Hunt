@@ -151,47 +151,70 @@ those tiles render as "Not open yet" rather than 404-ing mid-event.
 
 ## The 64 Grid
 
-Three equations give a number; that number mod 8 picks one of eight colours;
-that colour's eight scattered cells anagram to the answer. Extracted from
-SympoApp (`C:\Users\santh\SympoApp\SympoApp\SympoApp` — the copy up to date with
-`origin/branch`, not the outer checkout which is 7 commits behind and stuck
-mid-merge).
+Three steps, and each one gates the next:
 
-**The answer never reaches the browser.** `src/lib/hunt/gridPuzzle.server.ts`
-holds the word list, the seed and the target colour; the client is sent only the
-shuffled `{letter, colour}` pairs and the equation text. `/api/team/grid` is the
-only place a right answer is recognised, and it takes the team from the session
-cookie, never the body.
+1. **Identify** — every team belongs to a universe: `index = teamNumber mod 8`.
+   They type it; the server checks it. Only a correct index returns the card.
+2. **Decode** — that universe's RGB cipher is revealed
+   (`R = (148 + 17(n + 3)) mod 256`, and so on). They substitute **n** and enter
+   all three channels. Only an exact match opens step 3.
+3. **Unscramble** — find that colour's eight scattered cells in the 8x8 grid and
+   read the word. **The grid is never highlighted or dimmed** — every cell renders
+   identically, and spotting which eight carry the team's colour is the work.
+   The eight letters are not listed for them either.
 
-That split is the whole point. Upstream, `SixtyFourGrid.tsx` used to
-`import { CODES } from "@/lib/hunt/codes"` and compare in the browser — and
+The eight answers are **technical words**, all exactly eight letters, all real
+words (if only the target group spelled something, a team could skip the cipher
+and scan for the group that reads). No two may be anagrams of each other, and
+none should have a common non-technical anagram — TERMINAL was dropped for
+exactly that, since it anagrams to TRAMLINE. `grid.test.ts` enforces both rules.
+
+**Neither answer is printed on screen.** Step 1 states the rule in words but
+never the substituted formula — rendering `index = 17 mod 8` would be rendering
+the answer. Step 2 names `n` but never its value, and the resulting colour is
+never sent to the browser, so there is nothing on the page to compare against
+and the arithmetic has to actually happen. `n` is the universe index the team
+just proved it knows at step 1.
+
+**The eight grid colours are computed, not chosen.** Each is the output of its
+own universe's cipher, so a team's arithmetic lands exactly on the swatch they
+need. `grid.test.ts` asserts all eight, which is the invariant that keeps the
+round solvable — get one wrong and the board still renders perfectly with
+nothing to find.
+
+| # | Codename | Designation | Colour |
+|---|---|---|---|
+| 0 | RIOT | Earth-616 | `#c1121f` |
+| 1 | PUNK | Earth-138 | `#e85d04` |
+| 2 | SLAM | Earth-8311 | `#e9c46a` |
+| 3 | VENOM | Earth-1000 | `#2a9d8f` |
+| 4 | ELECTRIC | Earth-928 | `#3a56d4` |
+| 5 | ANARCHY | Earth-65 | `#7b2fbe` |
+| 6 | SMASH | Earth-1610 | `#d90066` |
+| 7 | GHOST | Earth-90214 | `#b0b0b0` |
+
+**Every universe has its own answer.** Teams 9 and 17 are both universe 1 and
+share a word; team 10 is universe 2 and does not. `isCorrectAnswer` takes the
+team number for exactly this reason.
+
+**The step-3 swatches carry no index, and their order is shuffled per team.**
+That is what makes step 2 load-bearing: a team that skipped the arithmetic knows
+its index but cannot tell which swatch that is, because neither position nor
+label gives it away. Only the decoded hex identifies it. Shuffling is
+deterministic per team, so a coordinator can still talk someone through their
+screen, but "mine is the third one" never travels across the room.
+
+**Nothing secret reaches the browser.** `gridPuzzle.server.ts` holds the words,
+the seed and the whole cipher table; the client is sent the shuffled
+`{letter, colour}` pairs and — only after a correct index — its own universe's
+three equations. Never the resulting colour, never the word. Verified after
+every build by grepping `.next/static`.
+
+That split is the whole point. Upstream, `SixtyFourGrid.tsx` did
+`import { CODES } from "@/lib/hunt/codes"` and compared in the browser — and
 because bundlers do not tree-shake individual properties off an object read by
 member expression, importing CODES for one field shipped **all four reveal codes
-in the hunt** into that route's client chunk. The finalised upstream component
-fixed it; this port keeps that shape and verifies it (`.next/static` is grepped
-for the answer, the word list and the seed after every build).
-
-`src/lib/hunt/grid.test.ts` guards the invariants — chiefly that the equations
-actually sum to the colour whose letters spell the answer. If that ever breaks,
-the grid still renders perfectly and the puzzle is simply impossible.
-
-Both paths use the same `$setOnInsert` first-stamp-wins rule, so a team that
-ticks a round the game also stamps keeps their original time.
-
-To wire another round: add a base-URL env var, add an entry to `EXTERNAL_ROUNDS`
-in `src/lib/events.ts`, and have that app accept `?team=N`. Nothing in the
-components changes.
-
-> If you change the round list, update `HUNT_SLUGS` in
-> `octavius-circuit-app/src/lib/db.ts` too — it holds a copy in order to
-> recompute finish times, and a stale copy means a team finishes and the
-> dashboard never notices.
-
-`slug` values match SympoApp's challenge slugs (`circuit-1`, `hunt-blueprint`,
-`hunt-room`, `hunt-grid`, `hunt-shiftverse`), and progress is read from a
-`hunt_progress` collection with the same shape the real graders write — so
-pointing `MONGODB_URI` at the live database lights the tiles up with real
-solves and no code change here.
+in the hunt** into that route's client chunk.
 
 ## Notes
 

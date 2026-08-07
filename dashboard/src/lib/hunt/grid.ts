@@ -11,10 +11,37 @@
  * `gridPuzzle.server.ts` and must never be imported from a client component.
  */
 
+/**
+ * The eight universe colours.
+ *
+ * NOT CHOSEN — COMPUTED. Each one is the output of its universe's RGB cipher
+ * with n = that universe's index, so the arithmetic a team does on the equation
+ * card lands exactly on the swatch they need. `gridPuzzle.server.ts` holds the
+ * equations and `grid.test.ts` asserts these eight values are what they
+ * produce, so the two can never drift apart.
+ *
+ * Index 7 (GHOST) coming out a perfect neutral grey is the giveaway that the
+ * ciphers were designed backwards from a palette rather than the other way
+ * round.
+ */
 export const GRID_COLOURS = [
-  "#e63946", "#f4a261", "#e9c46a", "#2a9d8f",
-  "#4361ee", "#7209b7", "#f72585", "#d8e2dc",
+  "#c1121f", // 0 RIOT      Earth-616
+  "#e85d04", // 1 PUNK      Earth-138
+  "#e9c46a", // 2 SLAM      Earth-8311
+  "#2a9d8f", // 3 VENOM     Earth-1000
+  "#3a56d4", // 4 ELECTRIC  Earth-928
+  "#7b2fbe", // 5 ANARCHY   Earth-65
+  "#d90066", // 6 SMASH     Earth-1610
+  "#b0b0b0", // 7 GHOST     Earth-90214
 ] as const;
+
+/** Universes, colours and grid words are all the same eight. */
+export const UNIVERSE_COUNT = 8;
+
+/** Which universe a team belongs to. The first thing they have to work out. */
+export function universeFor(teamNumber: number): number {
+  return ((teamNumber % UNIVERSE_COUNT) + UNIVERSE_COUNT) % UNIVERSE_COUNT;
+}
 
 export interface GridCell {
   letter: string;

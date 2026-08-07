@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import SixtyFourGrid from "./SixtyFourGrid";
 import { COOKIE_NAME, readSession } from "@/lib/session";
-import { EQUATIONS, gridCells } from "@/lib/hunt/gridPuzzle.server";
+import { colourFor, gridCells } from "@/lib/hunt/gridPuzzle.server";
+import { universeFor } from "@/lib/hunt/grid";
 import { huntProgress, isConfigured } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -54,8 +55,8 @@ export default async function GridRoundPage() {
             </div>
             <h1 className="display mt-4 text-4xl text-ink sm:text-5xl">64 Grid</h1>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-ink-2">
-              Sixty-four coloured letters. Three equations pick a colour; that
-              colour&apos;s eight letters anagram to the answer.
+              Find your universe, decode its colour cipher, then read the word
+              hidden in that colour&apos;s eight letters.
             </p>
           </div>
 
@@ -81,8 +82,17 @@ export default async function GridRoundPage() {
         <div className="anim-rise mt-6">
           <SixtyFourGrid
             cells={gridCells()}
-            equations={[...EQUATIONS]}
+            teamNumber={teamNumber}
             alreadySolved={alreadySolved}
+            /* ONLY for a team that has already cleared the round. Their answer
+               is behind them, so handing back the colour lets them revisit the
+               board instead of re-deriving it. For everyone else this is null
+               and the colour is earned at step 2. */
+            solvedUniverse={
+              alreadySolved
+                ? { index: universeFor(teamNumber), colour: colourFor(universeFor(teamNumber)) }
+                : null
+            }
           />
         </div>
       </div>

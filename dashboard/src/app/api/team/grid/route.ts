@@ -40,7 +40,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Expected an answer." }, { status: 400 });
   }
 
-  if (!isCorrectAnswer(answer)) {
+  // Per-universe: the expected word depends on this team's universe
+  // (teamNumber mod 8), so team 9 and team 10 are answering different puzzles.
+  if (!isCorrectAnswer(teamNumber, answer)) {
     // Deliberately no detail — "wrong letter 3" would turn eight cells into a
     // guessing game against the server rather than an anagram.
     return NextResponse.json({ correct: false });
