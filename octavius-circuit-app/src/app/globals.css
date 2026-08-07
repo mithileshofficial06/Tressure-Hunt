@@ -1,0 +1,126 @@
+/*
+ * Chrome around the game — the status strip, banners and gate screens.
+ *
+ * Deliberately small and plain CSS, not Tailwind: `game_src/style.css` is the
+ * real stylesheet here and it styles by element id. Adding a utility framework
+ * on top would mean two systems fighting over the same page for the sake of a
+ * dozen rules.
+ *
+ * Colours are lifted from the game's own palette so the strip reads as part of
+ * it rather than a browser chrome bar bolted on top.
+ */
+
+:root {
+  --oc-ink: #0b0f19;
+  --oc-paper: #ffffff;
+  --oc-cyan: #00e5ff;
+  --oc-green: #39ff14;
+  --oc-red: #ff2d6d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--oc-ink);
+  color: var(--oc-paper);
+  font-family: ui-monospace, "Courier New", monospace;
+}
+
+/* ── Status strip ───────────────────────────────────────────────────────── */
+.oc-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.oc-strip__back {
+  color: var(--oc-cyan);
+  text-decoration: none;
+}
+.oc-strip__back:hover {
+  text-decoration: underline;
+}
+
+.oc-strip__team {
+  font-weight: 700;
+  color: var(--oc-paper);
+}
+
+/* Pushed right so the level counter is always in the same place to glance at. */
+.oc-strip__count {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ── Banners ────────────────────────────────────────────────────────────── */
+.oc-banner {
+  padding: 0.75rem 1rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  border-left: 6px solid;
+}
+
+.oc-banner--good {
+  border-left-color: var(--oc-green);
+  background: rgba(57, 255, 20, 0.08);
+  color: var(--oc-green);
+}
+
+.oc-banner--bad {
+  border-left-color: var(--oc-red);
+  background: rgba(255, 45, 109, 0.08);
+  color: var(--oc-red);
+}
+
+.oc-banner a {
+  color: inherit;
+}
+
+.oc-banner__detail {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+/* ── Gate + loading ─────────────────────────────────────────────────────── */
+.oc-gate {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+  text-align: center;
+}
+
+.oc-gate h1 {
+  font-size: 1.5rem;
+  letter-spacing: 0.05em;
+}
+
+.oc-gate p {
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.6;
+}
+
+.oc-gate a {
+  display: inline-block;
+  margin-top: 1rem;
+  color: var(--oc-cyan);
+}
+
+.oc-loading {
+  padding: 4rem 1rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+}

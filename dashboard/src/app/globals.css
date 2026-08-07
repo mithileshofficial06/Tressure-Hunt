@@ -1,0 +1,410 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════
+   CONCRETE — a brutalist design system
+
+   Paper, ink, one accent, and hard 2px rules. No
+   gradients, no glows, no rounded corners, no tilts.
+   Depth comes from a flat offset shadow and nothing
+   else, because that is the one shadow a printer and
+   a projector both reproduce honestly.
+
+   Replaces the previous Spider-Verse comic theme
+   (chromatic aberration, halftone dots, rotated
+   stickers, noise overlay) — all of which are gone.
+   ═══════════════════════════════════════════════════ */
+
+:root {
+  /* ── Ground ─────────────────────────────────────────────────────────── */
+  --paper: #f4f2ed;      /* page */
+  --paper-2: #eae7e0;    /* recessed: table headers, inert cells */
+  --card: #ffffff;       /* raised: every slab */
+
+  /* ── Ink ────────────────────────────────────────────────────────────── */
+  --ink: #111111;        /* body + rules */
+  --ink-2: #3d3a35;      /* secondary text */
+  --ink-3: #6b6760;      /* labels, captions, disabled */
+
+  --rule: #111111;       /* structural borders — always full-strength */
+  --rule-soft: #c9c5bc;  /* internal dividers inside a slab */
+
+  /* ── Accent ─────────────────────────────────────────────────────────────
+     TWO oranges, and the split is not decorative.
+
+     --accent (#FF4A00) on paper measures 3.0:1. That passes WCAG AA for
+     large text (>=24px, or >=18.66px bold) and for UI component boundaries,
+     and FAILS the 4.5:1 required for body text. So it is for fills, rules and
+     big numerals only.
+
+     --accent-ink (#C63A00) measures 4.7:1 on paper and is the only orange
+     allowed on small text.
+
+     Ink on an --accent fill measures 5.6:1, which is why accent buttons and
+     badges are ink-on-orange rather than white-on-orange (white would be the
+     same failing 3.0:1). */
+  --accent: #ff4a00;
+  --accent-ink: #c63a00;
+  --accent-wash: #ffece5;
+
+  /* ── Semantic ───────────────────────────────────────────────────────────
+     Chosen dark enough to clear 4.5:1 on paper, since all three appear as
+     small status text. */
+  --good: #0b7a45;
+  --bad: #c21b17;
+  --warn: #8a5a00;
+
+  --shadow: 4px 4px 0 0 var(--ink);
+  --shadow-sm: 2px 2px 0 0 var(--ink);
+}
+
+@theme inline {
+  --color-paper: #f4f2ed;
+  --color-paper-2: #eae7e0;
+  --color-card: #ffffff;
+  --color-ink: #111111;
+  --color-ink-2: #3d3a35;
+  --color-ink-3: #6b6760;
+  --color-rule: #111111;
+  --color-rule-soft: #c9c5bc;
+  --color-accent: #ff4a00;
+  --color-accent-ink: #c63a00;
+  --color-accent-wash: #ffece5;
+  --color-good: #0b7a45;
+  --color-bad: #c21b17;
+  --color-warn: #8a5a00;
+
+  --font-display: var(--font-archivo), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-inter), system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* A visible focus ring is non-negotiable on a design with no hover colour
+     shifts — keyboard users would otherwise have nothing to go on. */
+  :focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+/* ── Backdrop ──────────────────────────────────────────────────────────────
+   A drafting grid, drawn in CSS. Two line sets so the eye reads a coarse
+   module over a fine one; kept under 5% alpha so it never competes with the
+   slabs sitting on top of it. */
+.grid-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(to right, rgba(17, 17, 17, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(17, 17, 17, 0.045) 1px, transparent 1px),
+    linear-gradient(to right, rgba(17, 17, 17, 0.028) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(17, 17, 17, 0.028) 1px, transparent 1px);
+  background-size:
+    96px 96px,
+    96px 96px,
+    16px 16px,
+    16px 16px;
+}
+
+/* ── Slabs ─────────────────────────────────────────────────────────────────
+   The one container. Square corners, full-strength 2px rule, flat offset
+   shadow. `position: relative` so callers can absolutely position inside. */
+.slab {
+  position: relative;
+  background: var(--card);
+  border: 2px solid var(--rule);
+  box-shadow: var(--shadow);
+}
+
+.slab-flat {
+  position: relative;
+  background: var(--card);
+  border: 2px solid var(--rule);
+}
+
+/* A 6px accent spine. Used for the one panel on a screen that matters most. */
+.slab-accent {
+  border-left-width: 8px;
+  border-left-color: var(--accent);
+}
+
+.slab-good {
+  border-left-width: 8px;
+  border-left-color: var(--good);
+}
+.slab-bad {
+  border-left-width: 8px;
+  border-left-color: var(--bad);
+}
+.slab-warn {
+  border-left-width: 8px;
+  border-left-color: var(--warn);
+}
+
+/* ── Type ──────────────────────────────────────────────────────────────── */
+.display {
+  font-family: var(--font-archivo), system-ui, sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 0.95;
+}
+
+/* Small uppercase mono, for every field label and column head. */
+.label {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* Numbers that must not jitter as they tick. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.rule-line {
+  height: 2px;
+  background: var(--rule);
+  border: 0;
+}
+
+.rule-line-soft {
+  height: 1px;
+  background: var(--rule-soft);
+  border: 0;
+}
+
+/* ── Tags ──────────────────────────────────────────────────────────────────
+   Square, bordered, upright. The old theme rotated these 3deg; brutalism
+   does not tilt. */
+.tag {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 2px solid var(--rule);
+  background: var(--card);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.tag-accent {
+  background: var(--accent);
+  color: var(--ink); /* 5.6:1 — see the palette note */
+  border-color: var(--rule);
+}
+.tag-good {
+  background: var(--good);
+  color: #ffffff;
+}
+.tag-muted {
+  background: var(--paper-2);
+  color: var(--ink-3);
+  border-color: var(--rule-soft);
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────────
+   Press = the shadow collapses and the button moves into it. No colour
+   inversion, no scale, no glow. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.15rem;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--card);
+  border: 2px solid var(--rule);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease,
+    background-color 0.08s ease;
+}
+.btn:hover:not(:disabled) {
+  background: var(--paper-2);
+}
+.btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0 var(--ink);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: var(--ink);
+}
+.btn-accent:hover:not(:disabled) {
+  background: #e64300;
+}
+
+.btn-solid {
+  background: var(--ink);
+  color: var(--paper);
+}
+.btn-solid:hover:not(:disabled) {
+  background: #2b2b2b;
+}
+
+/* ── Stat block ────────────────────────────────────────────────────────────
+   Label over a big tabular figure. Used in every summary strip. */
+.stat-value {
+  font-family: var(--font-archivo), system-ui, sans-serif;
+  font-size: 2rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Inputs ────────────────────────────────────────────────────────────── */
+.field {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 0.95rem;
+  color: var(--ink);
+  background: var(--card);
+  border: 2px solid var(--rule);
+  outline: none;
+}
+.field::placeholder {
+  color: var(--ink-3);
+}
+.field:focus {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.field:disabled {
+  background: var(--paper-2);
+  color: var(--ink-3);
+}
+
+/* ── Motion ────────────────────────────────────────────────────────────────
+   Short, linear, no bounce. The previous theme popped and rotated things in;
+   this one just resolves them. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.anim-rise {
+  animation: rise 180ms ease-out both;
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.anim-pop {
+  animation: appear 140ms ease-out both;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+.anim-shake {
+  animation: shake 180ms ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise,
+  .anim-pop,
+  .anim-shake {
+    animation: none;
+  }
+}
+
+/* ── 64 Grid round ─────────────────────────────────────────────────────────
+   The eight cell colours are puzzle data and are set inline by the component;
+   nothing here may override them, or picking a colour would stop reading as
+   picking a colour. This is structure only. */
+.grid-cell {
+  user-select: none;
+  min-width: 0;
+  line-height: 1;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grid-cell {
+    transition: none !important;
+  }
+}
+
+/* ── Tables ────────────────────────────────────────────────────────────── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--paper-2);
+  border-bottom: 2px solid var(--rule);
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  white-space: nowrap;
+}
+.data-table tbody tr {
+  border-bottom: 1px solid var(--rule-soft);
+}
+.data-table tbody tr:hover {
+  background: var(--accent-wash);
+}
