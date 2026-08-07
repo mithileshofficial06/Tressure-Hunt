@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import "../../../game_src/style.css";
 import "../../../game_src/landing.css";
 import { dashboardUrl } from "@/lib/links";
+import RoundFooter from "./RoundFooter";
 
 interface SubmitResult {
   solved?: boolean;
@@ -114,11 +115,10 @@ export default function CircuitGame({
 
   return (
     <>
-      {/* ── Status strip ───────────────────────────────────────────────── */}
+      {/* ── Status strip ─────────────────────────────────────────────────
+          No back link here: navigation lives in the footer, where Back and
+          Finish sit together as a pair. */}
       <div className="oc-strip">
-        <a href={dashboardUrl()} className="oc-strip__back">
-          ← Back to the hunt board
-        </a>
         <span className="oc-strip__team">TEAM {teamNumber}</span>
         <span className="oc-strip__count">
           {solved.length} / {totalLevels} levels cleared
@@ -127,8 +127,7 @@ export default function CircuitGame({
 
       {roundComplete && (
         <div className="oc-banner oc-banner--good">
-          All five circuits complete — the round is marked done on your hunt board.{" "}
-          <a href={dashboardUrl()}>Return to the board →</a>
+          All five circuits complete — the round is marked done on your hunt board.
         </div>
       )}
 
@@ -236,6 +235,11 @@ export default function CircuitGame({
           </div>
         </div>
       </div>
+
+      {/* Finish is gated on the round being stamped — all five levels, each
+          verified server-side. `roundComplete` is the server's answer, not a
+          count the browser kept. */}
+      <RoundFooter teamNumber={teamNumber} solved={roundComplete} />
     </>
   );
 }

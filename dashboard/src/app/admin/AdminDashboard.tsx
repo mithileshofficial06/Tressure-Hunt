@@ -10,6 +10,25 @@ const POLL_MS = 8000;
 type SortKey = "number" | "progress" | "fastest";
 
 /**
+ * What each round cell shows.
+ *
+ *   clock  Cumulative from registration — the number that "continues from 20".
+ *   split  Time spent on that round alone.
+ *   time   Wall-clock time of day the stamp landed.
+ *
+ * Three views rather than three columns per round: at five rounds that would be
+ * fifteen columns, and a coordinator scanning for "who is stuck" needs one
+ * number per cell, not three.
+ */
+type CellView = "clock" | "split" | "time";
+
+const CELL_VIEW_LABEL: Record<CellView, string> = {
+  clock: "Cumulative clock",
+  split: "Time on round",
+  time: "Time of day",
+};
+
+/**
  * Everything, for the person running the event.
  *
  * One screen, no drill-downs: during a hunt the coordinator is being asked
@@ -36,6 +55,7 @@ export default function AdminDashboard({
   const [teams, setTeams] = useState(initialTeams);
   const [degraded, setDegraded] = useState(initialDegraded);
   const [sort, setSort] = useState<SortKey>("number");
+  const [cellView, setCellView] = useState<CellView>("clock");
   const [busyCell, setBusyCell] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -165,11 +185,21 @@ export default function AdminDashboard({
    * results file.
    */
   function exportCsv() {
+    // Every round contributes five columns: when it was stamped, who by, the
+    // order it was done in, the time spent on it, and the cumulative clock at
+    // that point. Raw ms goes alongside the formatted value so the file is
+    // usable in a spreadsheet without re-parsing "1h 23m 45s".
     const header = [
       "Team",
       "Members",
       "Registered",
-      ...events.flatMap((e) => [`${e.title} — solved`, `${e.title} — by`]),
+      ...events.flatMap((e) => [
+        `${e.title} — solved`,
+        `${e.title} — by`,
+        `${e.title} — order`,
+        `${e.title} — on round`,
+        `${e.title} — clock`,
+      ]),
       "Finished",
       "Total time",
       "Total ms",
@@ -183,7 +213,13 @@ export default function AdminDashboard({
         formatStamp(t.registeredAt),
         ...events.flatMap((e) => {
           const r = t.rounds.find((x) => x.slug === e.slug);
-          return [formatStamp(r?.solvedAt ?? null), r?.markedBy ?? ""];
+          return [
+            formatStamp(r?.solvedAt ?? null),
+            r?.markedBy ?? "",
+            r?.order === null || r?.order === undefined ? "" : String(r.order),
+            r?.splitMs === null || r?.splitMs === undefined ? "" : formatDuration(r.splitMs),
+            r?.elapsedMs === null || r?.elapsedMs === undefined ? "" : formatDuration(r.elapsedMs),
+          ];
         }),
         formatStamp(t.completedAt),
         t.durationMs === null ? "" : formatDuration(t.durationMs),
@@ -294,26 +330,46 @@ export default function AdminDashboard({
         <section className="anim-rise mt-10">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <h2 className="label">All teams</h2>
-            <div className="flex items-center gap-1">
-              <span className="label mr-1">Sort</span>
-              {(["number", "progress", "fastest"] as SortKey[]).map((key) => (
-                <button
-                  key={key}
-                  onClick={() => setSort(key)}
-                  className={`border-2 border-rule px-2 py-1 font-mono text-[0.65rem] font-bold uppercase tracking-wider ${
-                    sort === key ? "bg-accent text-ink" : "bg-card text-ink-2 hover:bg-accent-wash"
-                  }`}
-                >
-                  {key}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-1">
+                <span className="label mr-1">Cells</span>
+                {(["clock", "split", "time"] as CellView[]).map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => setCellView(key)}
+                    title={CELL_VIEW_LABEL[key]}
+                    className={`border-2 border-rule px-2 py-1 font-mono text-[0.65rem] font-bold uppercase tracking-wider ${
+                      cellView === key
+                        ? "bg-accent text-ink"
+                        : "bg-card text-ink-2 hover:bg-accent-wash"
+                    }`}
+                  >
+                    {key}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="label mr-1">Sort</span>
+                {(["number", "progress", "fastest"] as SortKey[]).map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => setSort(key)}
+                    className={`border-2 border-rule px-2 py-1 font-mono text-[0.65rem] font-bold uppercase tracking-wider ${
+                      sort === key ? "bg-accent text-ink" : "bg-card text-ink-2 hover:bg-accent-wash"
+                    }`}
+                  >
+                    {key}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           <hr className="rule-line mt-2" />
 
           <p className="mt-2 font-mono text-[0.7rem] text-ink-3">
-            Click a round cell to stamp or un-stamp it. Click a row for the roster.
+            Cells show <strong className="text-ink-2">{CELL_VIEW_LABEL[cellView].toLowerCase()}</strong>.
+            Click one to stamp or un-stamp it. Click a row for the roster and full splits.
           </p>
 
           {teams.length === 0 ? (
@@ -384,7 +440,15 @@ export default function AdminDashboard({
                                   disabled={busyCell !== null}
                                   title={
                                     solved
-                                      ? `Solved ${formatStamp(round?.solvedAt ?? null)} (${round?.markedBy}) — click to un-mark`
+                                      ? [
+                                          `Solved ${formatStamp(round?.solvedAt ?? null)} (${round?.markedBy})`,
+                                          `Clock: ${formatDuration(round?.elapsedMs ?? null)}`,
+                                          `On this round: ${formatDuration(round?.splitMs ?? null)}`,
+                                          round?.order ? `Order: #${round.order}` : "",
+                                          "Click to un-mark",
+                                        ]
+                                          .filter(Boolean)
+                                          .join("\n")
                                       : "Not solved — click to stamp"
                                   }
                                   className={`w-full border-2 px-1 py-1.5 font-mono text-[0.7rem] tabular disabled:opacity-40 ${
@@ -395,9 +459,13 @@ export default function AdminDashboard({
                                 >
                                   {busyCell === cell
                                     ? "…"
-                                    : solved
-                                      ? formatClock(round!.solvedAt)
-                                      : "—"}
+                                    : !solved
+                                      ? "—"
+                                      : cellView === "time"
+                                        ? formatClock(round!.solvedAt)
+                                        : cellView === "split"
+                                          ? formatDuration(round!.splitMs)
+                                          : formatDuration(round!.elapsedMs)}
                                   {solved && round?.markedBy === "admin" && (
                                     <span className="ml-1 opacity-80">*</span>
                                   )}
@@ -440,10 +508,15 @@ export default function AdminDashboard({
                                   </ol>
                                 </div>
                                 <div>
-                                  <p className="label">Registered</p>
+                                  <p className="label">Registered — clock start</p>
                                   <p className="mt-2 font-mono text-xs text-ink-2">
                                     {formatStamp(t.registeredAt)}
                                   </p>
+                                  {t.latestElapsedMs !== null && !done && (
+                                    <p className="mt-1 font-mono text-xs text-accent-ink">
+                                      Clock at last solve: {formatDuration(t.latestElapsedMs)}
+                                    </p>
+                                  )}
                                 </div>
                                 {done && (
                                   <div>
@@ -454,6 +527,44 @@ export default function AdminDashboard({
                                   </div>
                                 )}
                               </div>
+
+                              {/* The full run, in the order they actually did it —
+                                  which is where the cumulative clock becomes
+                                  readable as a story rather than five numbers. */}
+                              {t.solvedCount > 0 && (
+                                <div className="mt-4">
+                                  <p className="label">Run order</p>
+                                  <table className="mt-2 w-full max-w-2xl border-2 border-rule bg-card">
+                                    <thead>
+                                      <tr className="border-b-2 border-rule">
+                                        <Th>#</Th>
+                                        <Th>Round</Th>
+                                        <Th>Stamped</Th>
+                                        <Th>On round</Th>
+                                        <Th>Clock</Th>
+                                        <Th>By</Th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {[...t.rounds]
+                                        .filter((r) => r.order !== null)
+                                        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+                                        .map((r) => (
+                                          <tr key={r.slug} className="border-b border-rule-soft">
+                                            <Td>{r.order}</Td>
+                                            <Td>
+                                              {events.find((e) => e.slug === r.slug)?.title ?? r.slug}
+                                            </Td>
+                                            <Td>{formatClock(r.solvedAt)}</Td>
+                                            <Td>{formatDuration(r.splitMs)}</Td>
+                                            <Td strong>{formatDuration(r.elapsedMs)}</Td>
+                                            <Td>{r.markedBy ?? ""}</Td>
+                                          </tr>
+                                        ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
                             </td>
                           </tr>
                         )}
@@ -476,6 +587,27 @@ export default function AdminDashboard({
 }
 
 /* ── Small pieces ────────────────────────────────────────────────────────── */
+
+/** Header + cell for the per-team run-order breakdown. */
+function Th({ children }: { children: React.ReactNode }) {
+  return (
+    <th className="px-2 py-1.5 text-left font-mono text-[0.6rem] font-bold uppercase tracking-widest text-ink-3">
+      {children}
+    </th>
+  );
+}
+
+function Td({ children, strong = false }: { children: React.ReactNode; strong?: boolean }) {
+  return (
+    <td
+      className={`px-2 py-1.5 font-mono text-xs tabular ${
+        strong ? "font-bold text-ink" : "text-ink-2"
+      }`}
+    >
+      {children}
+    </td>
+  );
+}
 
 function Stat({
   label,

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Dashboard, { type SolvedRound } from "./Dashboard";
 import { COOKIE_NAME, readSession } from "@/lib/session";
 import { resolveEventHrefs } from "@/lib/events";
-import { findTeam, huntProgress, isConfigured } from "@/lib/db";
+import { findTeam, isConfigured, teamSummary } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -45,16 +45,20 @@ export default async function DashboardPage() {
         completedAt = team.completedAt ? team.completedAt.toISOString() : null;
         durationMs = team.durationMs ?? null;
 
-        const progress = await huntProgress();
-        const rows = await progress
-          .find({ teamNumber, solvedAt: { $ne: null } }, { projection: { _id: 0 } })
-          .toArray();
-
-        solved = rows.map((r) => ({
-          slug: r.challengeSlug,
-          solvedAt: r.solvedAt!.toISOString(),
-          markedBy: r.markedBy,
-        }));
+        // Timings are derived from registeredAt + the solve stamps, so the
+        // board shows the same cumulative clock the finish dialogue and the
+        // admin table do — one calculation, three surfaces.
+        const summary = await teamSummary(teamNumber);
+        solved = (summary?.rounds ?? [])
+          .filter((r) => r.solvedAt !== null)
+          .map((r) => ({
+            slug: r.slug,
+            solvedAt: r.solvedAt!,
+            markedBy: (r.markedBy ?? "team") as "team" | "admin",
+            elapsedMs: r.elapsedMs,
+            splitMs: r.splitMs,
+            order: r.order,
+          }));
       }
     } catch (err) {
       // A team that has registered should still see their board if the

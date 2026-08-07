@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findTeam } from '@/lib/db';
 import { isValidTeamNumber, MAX_TEAM, MIN_TEAM } from '@/lib/teamRange';
+import { stampRoundSolved } from '@/lib/hunt';
 
 /**
  * POST /api/team/[teamNumber]/guess
@@ -47,6 +48,22 @@ export async function POST(
     const correct = guessedWord.toUpperCase() === team.plaintextWord.toUpperCase();
 
     if (correct) {
+      // Credit the round on the hunt board. Previously this route verified the
+      // answer and then told nobody, so a team had to go back and tick the
+      // round by hand — and the Finish button below has no way to know the
+      // round is done unless the solve is recorded.
+      //
+      // Stamping is idempotent and first-write-wins, so replaying a solved
+      // puzzle cannot move the team's clock.
+      try {
+        await stampRoundSolved(teamNumber);
+      } catch (err) {
+        // A correct answer stays correct even if the write fails. Log it and
+        // let the team see their win rather than showing a false negative;
+        // a coordinator can stamp it from the admin board.
+        console.error('[guess] failed to stamp hunt progress', err);
+      }
+
       return NextResponse.json({ correct, decryptedWord: team.plaintextWord });
     }
 

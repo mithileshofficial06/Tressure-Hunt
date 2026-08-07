@@ -1,5 +1,6 @@
 import { MongoClient, type Collection, type Db } from "mongodb";
-import { EVENT_SLUGS } from "./events";
+import { EVENT_SLUGS, POINTS_PER_ROUND } from "./events";
+import { deriveTimings, type RoundTiming } from "./timings";
 
 /**
  * Mongo, and the two indexes that keep the event honest.
@@ -287,13 +288,9 @@ export async function recomputeCompletion(teamNumber: number): Promise<void> {
   await collection.updateOne({ teamNumber }, { $set: { completedAt, durationMs } });
 }
 
-/* ── Admin read model ──────────────────────────────────────────────────── */
+/* ── Read model ────────────────────────────────────────────────────────── */
 
-export interface TeamRoundView {
-  slug: string;
-  solvedAt: string | null;
-  markedBy: "team" | "admin" | null;
-}
+export type TeamRoundView = RoundTiming;
 
 export interface TeamView {
   teamNumber: number;
@@ -302,7 +299,59 @@ export interface TeamView {
   completedAt: string | null;
   durationMs: number | null;
   solvedCount: number;
-  rounds: TeamRoundView[];
+  /** Cumulative clock at the most recent solve, even mid-hunt. */
+  latestElapsedMs: number | null;
+  rounds: RoundTiming[];
+}
+
+/**
+ * One team's standing, for the finish dialogue a round shows on its way out.
+ *
+ * Points are counted from the ROUND LIST, not from the progress rows, so a
+ * stale row for a retired slug cannot inflate a score.
+ */
+export interface TeamSummary {
+  teamNumber: number;
+  registeredAt: string;
+  rounds: RoundTiming[];
+  solvedCount: number;
+  totalRounds: number;
+  points: number;
+  totalPoints: number;
+  latestElapsedMs: number | null;
+  totalMs: number | null;
+  completedAt: string | null;
+}
+
+export async function teamSummary(teamNumber: number): Promise<TeamSummary | null> {
+  const [team, rows] = await Promise.all([findTeam(teamNumber), teamProgress(teamNumber)]);
+  if (!team) return null;
+
+  const registeredAt = team.registeredAt?.getTime() ?? null;
+  const t = deriveTimings(
+    registeredAt,
+    rows
+      .filter((r) => r.solvedAt instanceof Date)
+      .map((r) => ({
+        slug: r.challengeSlug,
+        solvedAt: r.solvedAt!.getTime(),
+        markedBy: r.markedBy,
+      })),
+    EVENT_SLUGS
+  );
+
+  return {
+    teamNumber,
+    registeredAt: team.registeredAt.toISOString(),
+    rounds: t.rounds,
+    solvedCount: t.solvedCount,
+    totalRounds: EVENT_SLUGS.length,
+    points: t.solvedCount * POINTS_PER_ROUND,
+    totalPoints: EVENT_SLUGS.length * POINTS_PER_ROUND,
+    latestElapsedMs: t.latestElapsedMs,
+    totalMs: t.totalMs,
+    completedAt: t.completedAt,
+  };
 }
 
 /**
@@ -334,14 +383,23 @@ export async function allTeamsWithProgress(): Promise<TeamView[]> {
 
   return teamDocs.map((team) => {
     const rows = byTeam.get(team.teamNumber) ?? [];
-    const rounds: TeamRoundView[] = EVENT_SLUGS.map((slug) => {
-      const row = rows.find((r) => r.challengeSlug === slug);
-      return {
-        slug,
-        solvedAt: row?.solvedAt ? row.solvedAt.toISOString() : null,
-        markedBy: row?.solvedAt ? row.markedBy : null,
-      };
-    });
+
+    // Cumulative elapsed and per-round splits are DERIVED here, not stored.
+    // They are a pure function of registeredAt and the solve stamps, so an
+    // admin override recomputes every downstream number for free — a stored
+    // copy would need its own invalidation and would eventually disagree with
+    // the timestamps sitting next to it.
+    const t = deriveTimings(
+      team.registeredAt?.getTime() ?? null,
+      rows
+        .filter((r) => r.solvedAt instanceof Date)
+        .map((r) => ({
+          slug: r.challengeSlug,
+          solvedAt: r.solvedAt!.getTime(),
+          markedBy: r.markedBy,
+        })),
+      EVENT_SLUGS
+    );
 
     return {
       teamNumber: team.teamNumber,
@@ -349,8 +407,9 @@ export async function allTeamsWithProgress(): Promise<TeamView[]> {
       registeredAt: team.registeredAt.toISOString(),
       completedAt: team.completedAt ? team.completedAt.toISOString() : null,
       durationMs: team.durationMs ?? null,
-      solvedCount: rounds.filter((r) => r.solvedAt !== null).length,
-      rounds,
+      solvedCount: t.solvedCount,
+      latestElapsedMs: t.latestElapsedMs,
+      rounds: t.rounds,
     };
   });
 }

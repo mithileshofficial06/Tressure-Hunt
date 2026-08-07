@@ -1,5 +1,9 @@
 import ShiftVerse from '../components/ShiftVerse';
 import { isValidTeamNumber } from '@/lib/teamRange';
+import { hasSolvedRound } from '@/lib/hunt';
+
+/** Progress is per-team and changes mid-event — never serve this from a cache. */
+export const dynamic = 'force-dynamic';
 
 /**
  * /game — optionally pre-loaded with a team.
@@ -25,5 +29,18 @@ export default async function GamePage({
   const parsed = team ? parseInt(team, 10) : NaN;
   const initialTeam = isValidTeamNumber(parsed) ? parsed : null;
 
-  return <ShiftVerse initialTeam={initialTeam} />;
+  // Gates the Finish button. Read from the server, not inferred in the browser:
+  // a team returning to a round they already cleared should still be able to
+  // collect it, and nothing the page decides on its own may enable that button.
+  let alreadySolved = false;
+  if (initialTeam !== null) {
+    try {
+      alreadySolved = await hasSolvedRound(initialTeam);
+    } catch (err) {
+      // Let them play. Worst case the button stays disabled until they solve.
+      console.error('[game] progress read failed', err);
+    }
+  }
+
+  return <ShiftVerse initialTeam={initialTeam} alreadySolved={alreadySolved} />;
 }

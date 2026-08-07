@@ -65,6 +65,15 @@ export const EVENTS: readonly HuntEvent[] = [
 
 export const EVENT_SLUGS = EVENTS.map((e) => e.slug);
 
+/**
+ * Every round is worth the same.
+ *
+ * Named here so the separate round apps can report "+100" in their finish
+ * dialogue without importing this package — they hold their own copy, and this
+ * is the one to change if scoring ever stops being flat.
+ */
+export const POINTS_PER_ROUND = 100;
+
 export const SHIFTVERSE_SLUG = "hunt-shiftverse";
 export const CIRCUIT_SLUG = "circuit-1";
 export const GRID_SLUG = "hunt-grid";

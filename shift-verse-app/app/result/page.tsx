@@ -4,6 +4,7 @@ import React, { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Logo from '../components/Logo';
+import RoundFooter from '../components/RoundFooter';
 import { dashboardUrl } from '@/lib/links';
 
 const PortalBackground = dynamic(() => import('../components/PortalBackground'), {
@@ -100,6 +101,14 @@ function ResultContent() {
         <p className="result-screen__team">
           DIMENSION #{teamNumber}
         </p>
+
+        {/* The round was already stamped server-side by the guess route, so the
+            dialogue behind Finish reads real data regardless of what the query
+            string claims — a forged ?success=true just shows the team their
+            actual (unchanged) score. */}
+        {success && teamNumber !== '??' && Number.isFinite(Number(teamNumber)) && (
+          <RoundFooter teamNumber={Number(teamNumber)} solved />
+        )}
 
         {/* Action buttons */}
         <div className="result-screen__actions">

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { COOKIE_NAME, readSession } from "@/lib/session";
-import { isConfigured, markRoundSolved, recomputeCompletion, teamProgress, findTeam } from "@/lib/db";
+import { isConfigured, markRoundSolved, recomputeCompletion, teamSummary, findTeam } from "@/lib/db";
 import { EVENT_SLUGS } from "@/lib/events";
 
 /**
@@ -49,20 +49,25 @@ export async function POST(req: Request) {
     await markRoundSolved(teamNumber, slug, "team");
     await recomputeCompletion(teamNumber);
 
-    const rows = await teamProgress(teamNumber);
-    const team = await findTeam(teamNumber);
+    // Return the derived timings, not raw rows: the board renders the
+    // cumulative clock per round, and recomputing it here means the tile
+    // updates without a reload and cannot disagree with the admin table.
+    const summary = await teamSummary(teamNumber);
 
     return NextResponse.json({
       ok: true,
-      solved: rows
-        .filter((r) => r.solvedAt)
+      solved: (summary?.rounds ?? [])
+        .filter((r) => r.solvedAt !== null)
         .map((r) => ({
-          slug: r.challengeSlug,
-          solvedAt: r.solvedAt!.toISOString(),
-          markedBy: r.markedBy,
+          slug: r.slug,
+          solvedAt: r.solvedAt,
+          markedBy: r.markedBy ?? "team",
+          elapsedMs: r.elapsedMs,
+          splitMs: r.splitMs,
+          order: r.order,
         })),
-      completedAt: team?.completedAt ? team.completedAt.toISOString() : null,
-      durationMs: team?.durationMs ?? null,
+      completedAt: summary?.completedAt ?? null,
+      durationMs: summary?.totalMs ?? null,
     });
   } catch (err) {
     console.error("[team/progress] failed", err);

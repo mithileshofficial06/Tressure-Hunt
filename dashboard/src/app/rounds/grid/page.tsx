@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import SixtyFourGrid from "./SixtyFourGrid";
 import { COOKIE_NAME, readSession } from "@/lib/session";
 import { EQUATIONS, gridCells } from "@/lib/hunt/gridPuzzle.server";
@@ -60,14 +59,10 @@ export default async function GridRoundPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="tag tag-muted">
-              Team {String(teamNumber).padStart(2, "0")}
-            </span>
-            <Link href="/dashboard" className="btn">
-              ← Hunt board
-            </Link>
-          </div>
+          {/* Navigation lives in the footer, where the Back/Finish pair sits
+              together — a second "back" up here would just be a second place
+              to look for the same thing. */}
+          <span className="tag tag-muted">Team {String(teamNumber).padStart(2, "0")}</span>
         </header>
 
         <hr className="rule-line mt-4" />

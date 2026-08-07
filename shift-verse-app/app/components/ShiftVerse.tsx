@@ -6,6 +6,7 @@ import Logo from './Logo';
 import TeamEntry from './TeamEntry';
 import PuzzleBoard from './PuzzleBoard';
 import { dashboardUrl } from '@/lib/links';
+import RoundFooter from './RoundFooter';
 
 // Dynamically import PortalBackground with no SSR (Three.js requires browser)
 const PortalBackground = dynamic(() => import('./PortalBackground'), {
@@ -22,7 +23,13 @@ type AppState = 'ENTRY' | 'PUZZLE';
  * registration dashboard starts in PUZZLE, having already identified itself.
  * Opening /game with no team still starts at ENTRY as before.
  */
-export default function ShiftVerse({ initialTeam = null }: { initialTeam?: number | null }) {
+export default function ShiftVerse({
+  initialTeam = null,
+  alreadySolved = false,
+}: {
+  initialTeam?: number | null;
+  alreadySolved?: boolean;
+}) {
   const [appState, setAppState] = useState<AppState>(initialTeam !== null ? 'PUZZLE' : 'ENTRY');
   const [teamNumber, setTeamNumber] = useState<number | null>(initialTeam);
 
@@ -63,7 +70,12 @@ export default function ShiftVerse({ initialTeam = null }: { initialTeam?: numbe
         )}
 
         {appState === 'PUZZLE' && teamNumber !== null && (
-          <PuzzleBoard teamNumber={teamNumber} onBack={handleBack} />
+          <>
+            <PuzzleBoard teamNumber={teamNumber} onBack={handleBack} />
+            {/* Enabled only for a team that has already cleared this round —
+                solving it navigates to /result, which carries its own copy. */}
+            <RoundFooter teamNumber={teamNumber} solved={alreadySolved} />
+          </>
         )}
       </div>
     </>

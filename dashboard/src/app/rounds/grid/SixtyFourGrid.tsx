@@ -8,6 +8,7 @@ import {
   normaliseAnswer,
   type GridCell,
 } from "@/lib/hunt/grid";
+import RoundFooter from "../RoundFooter";
 
 /**
  * Contrast helpers for the grid cells.
@@ -135,6 +136,7 @@ export default function SixtyFourGrid({
   }
 
   return (
+    <>
     <div className="grid gap-6 lg:grid-cols-[1fr_1.15fr]">
       {/* ── LEFT: Equations → Colour → Anagram ── */}
       <div className="space-y-5">
@@ -322,5 +324,9 @@ export default function SixtyFourGrid({
         </div>
       </section>
     </div>
+
+    {/* Finish is gated on `solved`, which only the server can set. */}
+    <RoundFooter slug="hunt-grid" title="64 Grid" solved={solved} />
+    </>
   );
 }

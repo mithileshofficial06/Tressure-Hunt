@@ -8,6 +8,11 @@ export interface SolvedRound {
   slug: string;
   solvedAt: string;
   markedBy: "team" | "admin";
+  /** Cumulative clock at this solve — the number the next round continues from. */
+  elapsedMs?: number | null;
+  /** Time spent on this round alone. */
+  splitMs?: number | null;
+  order?: number | null;
 }
 
 /**
@@ -194,7 +199,11 @@ export default function Dashboard({
                     <div className="min-w-0 flex-1">
                       <span className="display block truncate text-lg text-ink">{e.title}</span>
                       <span className="mt-0.5 block truncate font-mono text-xs text-ink-3">
-                        {isSolved ? `Cleared ${formatClock(row.solvedAt)}` : e.tagline}
+                        {/* The cumulative clock, not the time of day — this is
+                            the number the next round continues from. */}
+                        {isSolved
+                          ? `Cleared at ${formatDuration(row.elapsedMs ?? null)}`
+                          : e.tagline}
                       </span>
                     </div>
 
@@ -208,10 +217,16 @@ export default function Dashboard({
                       <p className="text-sm leading-relaxed text-ink-2">{e.blurb}</p>
 
                       {isSolved && (
-                        <p className="mt-3 font-mono text-[0.7rem] text-ink-3">
-                          Stamped {formatClock(row.solvedAt)}
-                          {row.markedBy === "admin" && " by a coordinator"}
-                        </p>
+                        <div className="mt-3 grid gap-px border-2 border-rule bg-rule sm:grid-cols-3">
+                          <MiniStat label="Stamped" value={formatClock(row.solvedAt)} />
+                          <MiniStat label="Time on round" value={formatDuration(row.splitMs ?? null)} />
+                          <MiniStat label="Clock read" value={formatDuration(row.elapsedMs ?? null)} strong />
+                          {row.markedBy === "admin" && (
+                            <p className="bg-card px-3 py-2 font-mono text-[0.7rem] text-ink-3 sm:col-span-3">
+                              Stamped by a coordinator.
+                            </p>
+                          )}
+                        </div>
                       )}
 
                       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -257,6 +272,30 @@ export default function Dashboard({
         </p>
       </div>
     </main>
+  );
+}
+
+/** A single figure inside an expanded round tile. */
+function MiniStat({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
+  return (
+    <div className="bg-card px-3 py-2">
+      <span className="label block">{label}</span>
+      <span
+        className={`mt-0.5 block font-mono text-sm tabular ${
+          strong ? "font-bold text-accent-ink" : "text-ink-2"
+        }`}
+      >
+        {value}
+      </span>
+    </div>
   );
 }
 
