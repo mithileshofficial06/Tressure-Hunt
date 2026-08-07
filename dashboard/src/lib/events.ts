@@ -78,6 +78,7 @@ export const SHIFTVERSE_SLUG = "hunt-shiftverse";
 export const CIRCUIT_SLUG = "circuit-1";
 export const GRID_SLUG = "hunt-grid";
 export const ROOM_SLUG = "hunt-room";
+export const BLUEPRINT_SLUG = "hunt-blueprint";
 
 /**
  * Rounds that live inside THIS app, as ordinary routes.
@@ -105,6 +106,11 @@ const INTERNAL_ROUNDS: Record<string, string> = {
   // board read the session cookie instead of asking a team to type its number
   // into an entry screen that any other team could also type into.
   [SHIFTVERSE_SLUG]: "/rounds/shiftverse",
+  // The physical round. It is in-app for the same reason as the rest — the team
+  // is authenticated — but it is the one round the app cannot finish on its
+  // own: a coordinator has to release the location from
+  // /rounds/blueprint/coordinator before the access code is accepted.
+  [BLUEPRINT_SLUG]: "/rounds/blueprint",
 };
 
 /**

@@ -71,6 +71,30 @@ export interface LevelProgressDoc {
 }
 
 /**
+ * One row per team for Blueprint Recovery.
+ *
+ * This round has a state machine rather than a single solve, because a
+ * coordinator stands in the middle of it: the team walks to a sector, tells the
+ * app they are there, and a coordinator releases the location before the access
+ * code can be entered. `hunt_progress` records only "solved / not solved", so
+ * the intermediate states live here and `hunt-blueprint` is stamped in
+ * `hunt_progress` like any other round once the team reaches `complete`.
+ *
+ * Field names are camelCase Mongo conventions; the Supabase original used
+ * snake_case columns (`checkpoint_a_time`, `wrong_attempts_b`). Same meanings.
+ */
+export interface BlueprintTeamDoc {
+  teamNumber: number;
+  variantNumber: number;
+  status: "not_started" | "in_progress" | "awaiting_reveal" | "checkpoint_a_done" | "complete";
+  startTime: Date | null;
+  checkpointATime: Date | null;
+  completeTime: Date | null;
+  wrongAttemptsA: number;
+  wrongAttemptsB: number;
+}
+
+/**
  * Thrown when MONGODB_URI is absent.
  *
  * A distinct type so routes and pages can tell "you haven't added .env.local
@@ -204,6 +228,13 @@ async function ensureIndexes(): Promise<void> {
     await database
       .collection("shiftverse_teams")
       .createIndex({ teamNumber: 1 }, { unique: true, name: "teamNumber_unique" });
+    // Blueprint Recovery, one row per team. Unique so the "create it if the
+    // team has not started yet" upsert cannot race itself into two rows with
+    // two different states — which would leave a coordinator revealing on one
+    // and the team reading the other.
+    await database
+      .collection<BlueprintTeamDoc>("blueprint_teams")
+      .createIndex({ teamNumber: 1 }, { unique: true, name: "teamNumber_unique" });
   })();
 
   try {
@@ -251,6 +282,12 @@ export async function shiftverseTeams(): Promise<
 > {
   await ensureIndexes();
   return (await db()).collection("shiftverse_teams");
+}
+
+/** Blueprint Recovery's per-team state. See `lib/blueprint/progress.ts`. */
+export async function blueprintTeams(): Promise<Collection<BlueprintTeamDoc>> {
+  await ensureIndexes();
+  return (await db()).collection<BlueprintTeamDoc>("blueprint_teams");
 }
 
 /* ── Registration ──────────────────────────────────────────────────────── */
