@@ -73,6 +73,14 @@
   --color-bad: #c21b17;
   --color-warn: #8a5a00;
 
+  /* The Mystery Room's HUD only. The room is a dark first-person scene laid
+     over its own near-black canvas, so it needs an ink that reads on THAT
+     rather than on --paper — none of the tones above do. Named as upstream
+     names it (`text-paper-white`) so the twelve copied scene files did not have
+     to be edited to land here. Do not reach for this in the rest of the app:
+     on paper it is invisible, and --card is the white you want. */
+  --color-paper-white: #f6f4ef;
+
   --font-display: var(--font-archivo), system-ui, sans-serif;
   --font-body: var(--font-inter), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;

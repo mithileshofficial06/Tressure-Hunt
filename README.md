@@ -67,6 +67,13 @@ checkpoint, and types the access code printed on the card there.
 A first-person 3D antique room (react-three-fiber). Five sections, each solved
 by finding a word drawn somewhere in the scene and typing it into the console.
 
+> **This folder is the reference copy and is NOT what runs.** The room is now
+> live in the dashboard at `/rounds/room` — the files that actually execute are
+> `dashboard/src/app/rounds/room/` and `dashboard/src/lib/hunt/{roomTasks,manifest,morse,codes}.ts`.
+> Editing anything below changes nothing. See
+> [dashboard/README.md](dashboard/README.md#the-mystery-room) for what was
+> altered on the way in (two imports) and why.
+
 - `components/` — 12 files. `MysteryRoom.tsx` is the shell; `MysteryRoomScene.tsx`
   is the room (1.9k lines); the rest are individual props/puzzles: board,
   books, deer, drawers, tools, web bench, player controller, boundary, GLB loader.

@@ -37,6 +37,52 @@ at build time.
 | `ADMIN_CODE` | no | Typed into the team-number box to open `/admin`. Default `0904`. **Never** rename to `NEXT_PUBLIC_*` |
 | `MAX_TEAMS` | no | Highest claimable number, default 60 |
 
+### "Couldn't reach the database" on a laptop that worked last week
+
+Almost always the NETWORK, not the app. Many campus and home ISP networks block
+outbound **port 27017**, which is the only port Atlas listens on. The tell is
+that it fails the same way a firewall does — a silent TCP timeout, not a refusal
+and not an auth error:
+
+```bash
+# Does DNS work but the port not open? Then it is the network.
+node -e 'require("dns").promises.resolveSrv("_mongodb._tcp.<cluster>.mongodb.net").then(console.log)'
+node -e 'const s=require("net").createConnection({host:"portquiz.net",port:27017,timeout:9000});
+         s.on("connect",()=>{console.log("27017 allowed");s.destroy()});
+         s.on("timeout",()=>{console.log("27017 BLOCKED by this network");s.destroy()})'
+```
+
+`portquiz.net` accepts TCP on every port, so a timeout there is proof the
+network is filtering the port rather than anything being wrong with Atlas or the
+connection string. Fixes, in order of speed: switch to a phone hotspot, or point
+`MONGODB_URI` at a local `mongod`. **This does not affect a Vercel deployment** —
+the block is on the office/campus link, not on the datacenter that runs the app.
+
+## Deploying (Vercel)
+
+Four things, and two of them are easy to miss until sixty teams are waiting.
+
+1. **Atlas Network Access → `0.0.0.0/0`.** Serverless functions do not have
+   fixed egress IPs, so an allowlist of specific addresses will fail in
+   production no matter how right the URI is. The credentials remain the gate.
+2. **Set `SESSION_SECRET`** to 32+ random bytes. Unlike the other variables this
+   one is a hard failure in production — `session.ts` throws rather than falling
+   back to the dev key, deliberately, because a per-process random key would
+   sign every team out on each new instance.
+3. **Nothing else to deploy.** All five rounds are routes in THIS app, so there
+   are no `SHIFTVERSE_URL` / `OCTAVIUS_URL` variables and no second and third
+   deployment to keep in sync. Those variables were removed — if you find them
+   in an older `.env`, they are dead.
+4. **Seed Shift Verse's puzzles** into the same database (`shiftverse_teams`),
+   and keep `MAX_TEAMS` at 60 to match the seeded range. Without a seeded row a
+   team's board returns 404 with a message naming the seed.
+
+Pool sizing already adapts: on Vercel (`process.env.VERCEL`) each instance takes
+a small pool with **no idle floor**, because instances scale out and idle sockets
+multiply against an Atlas M0's 500-connection ceiling. On a long-lived
+`next start` it takes a generous pool with a few warm sockets instead. See
+`clientPromise()` in `src/lib/db.ts`.
+
 ## How "no two teams share a number" is enforced
 
 **A unique index, not a lookup.** `teams.teamNumber` carries
@@ -106,6 +152,12 @@ password, and it does not record *which* coordinator made a change.
 | `src/lib/hunt/grid.ts` | Grid building and anagram checks. **Client-safe** |
 | `src/lib/hunt/gridPuzzle.server.ts` | **Server only.** Words, seed, target colour, answer check |
 | `src/app/api/team/grid/route.ts` | The only place a right grid answer is recognised |
+| `src/app/rounds/room/` | The Mystery Room — page + `RoomRound` wrapper + 13 **upstream** scene files |
+| `src/lib/hunt/roomTasks.ts` | The five sections, their clues and codes. **Client-safe by design** |
+| `src/lib/hunt/manifest.ts`, `morse.ts` | The four loose case items; morse used by one section |
+| `src/lib/hunt/codes.ts` | `ROOM_CODE`. In the bundle on purpose — read the file |
+| `src/lib/hunt/roomPuzzle.server.ts` | **Server only.** The room's answer gate — authority, not secrecy |
+| `src/app/api/team/room/route.ts` | The only place the room's solve is stamped |
 | `src/lib/db.ts` | Mongo singleton, both unique indexes, `registerTeam`, `recomputeCompletion` |
 | `src/lib/session.ts` | HMAC-signed team and admin cookies — no DB read to verify |
 | `src/lib/admin.ts` | **Server-only.** The gate code and its constant-time compare |
@@ -117,37 +169,98 @@ password, and it does not record *which* coordinator made a change.
 
 ## Wiring the tiles to the real puzzles
 
-Three rounds are wired, in **two shapes**, decided by what the round carries:
+**Everything runs on one port.** Four rounds are ordinary routes in this app:
 
 ```
-hunt-grid       → /rounds/grid                     (in-app, this repo)
-circuit-1       → ${OCTAVIUS_URL}/game?team=N      (../octavius-circuit-app, port 3003)
-hunt-shiftverse → ${SHIFTVERSE_URL}/game?team=N    (../shift-verse-app,      port 3001)
+circuit-1       → /rounds/circuit
+hunt-room       → /rounds/room
+hunt-grid       → /rounds/grid
+hunt-shiftverse → /rounds/shiftverse
+hunt-blueprint  → null            (physical round — tile is inert by design)
 ```
 
-- **In-app** (`INTERNAL_ROUNDS`) for rounds that are just React on this design
-  system. The 64 Grid is one component and some CSS — a fourth server for it
-  would mean duplicating Tailwind, the tokens and the theme to gain nothing.
-  It also gets **real authentication**: the signed session cookie says which
-  team it is, so no query string to edit.
-- **Separate app** (`EXTERNAL_ROUNDS`) for rounds carrying their own engine,
-  stylesheet and megabytes of media. Those take the team number in the query
-  string, which is weaker — anyone can play as any registered team.
+### Why there is no longer a second port
 
-Both are resolved by `resolveEventHrefs()` in `src/lib/events.ts`, called from
-the dashboard page — server-side, so the base URLs are read at request time and
-never baked into the client bundle. The remaining two `href`s are `null`, so
-those tiles render as "Not open yet" rather than 404-ing mid-event.
+Octavius Circuit and Shift Verse used to be **separate Next apps** on ports 3003
+and 3001, and the tile linked out with `?team=N` in the query string. Folding
+them in removed, in order of how much they mattered:
+
+1. **Team identity was a number in a URL.** Any team could play as any other by
+   editing it. The rounds' own APIs could not defend against it — `/api/circuit/submit`
+   took `teamNumber` from the POST body and could only check the number existed
+   on the roster; a comment there said as much. Every round now reads the signed
+   session cookie, so there is nothing to edit.
+2. **Three MongoClients against one Atlas cluster** — this app, plus one in
+   `shift-verse-app/lib/db.ts` and *another* in its `lib/hunt.ts`. One pool now.
+3. **Three copies of the round list, `POINTS_PER_ROUND` and `deriveTimings`**,
+   each with a comment begging the reader to keep them in step. A stale copy
+   meant a team finished the hunt and a round's finish card disagreed.
+4. **Two duplicate `summary` endpoints**, which existed only because the
+   dashboard's is unreachable cross-origin (the session cookie is SameSite=Lax).
+5. **Two env vars and two servers to keep alive at deploy time.**
+
+**Weight was never the reason to split.** The Mystery Room is ~7,400 lines and
+pulls in three.js; Shift Verse brings a 1.2k-line stylesheet, a WebGL portal and
+~23 MB of media. Both are chunking and `public/` problems, not deployment
+problems. Heavy scenes load through `next/dynamic` with `ssr: false`, so their
+JS sits in a chunk only that route fetches — verified against a production
+build: the room's 1.1 MB chunk is in no page's initial payload.
+
+`resolveEventHrefs()` in `src/lib/events.ts` now has one shape and reads no env.
+
+### What the round routes must respect
+
+The circuit and Shift Verse each ship a stylesheet that sets `:root`, `*` and
+`html, body`. Two consequences, both already handled — don't undo them:
+
+- **No dashboard chrome on those two routes.** They are full-bleed and keep
+  their own look. The grid and the room, which use this design system, do get
+  the usual header.
+- **Both hide `.grid-bg`.** The root layout paints a fixed light paper backdrop
+  at `z-index: -1` on every page; on a dark round it sits *between* the body and
+  a transparent WebGL canvas, and the portal ends up floating on a beige grid.
+- **Leaving a round is a full page load** (`<a href>`, never `<Link>`), so a
+  round's stylesheet does not follow the team back to the board.
 
 **The wired rounds credit themselves differently, on purpose:**
 
 - **64 Grid** checks the answer server-side (`/api/team/grid`) and stamps
   `hunt-grid` on a correct one.
+- **Mystery Room** posts its reveal code to `/api/team/room` when the fifth
+  section opens, and the server stamps `hunt-room`. The code is on screen by
+  then — see `roomPuzzle.server.ts` for why the endpoint is still the authority.
 - **Octavius Circuit** verifies the board server-side, so when a team clears all
   five levels the app stamps `circuit-1` in `hunt_progress` itself and
   recomputes the consolidated finish. Nothing to tick by hand.
 - **Shift Verse** has no server-authoritative completion hook wired, so the team
   marks it complete on their own board as usual.
+
+## The Mystery Room
+
+Copied from [chrsnikhil/SympoApp](https://github.com/chrsnikhil/SympoApp)
+(`src/app/hunt/puzzles/MysteryRoom*.tsx`). **The thirteen scene files are
+upstream, essentially unmodified**, so a future pull is a copy rather than a
+merge. Exactly two things were changed in them:
+
+- `MysteryRoom.tsx` declares its own `MysteryRoomProps` instead of importing
+  `PuzzleProps` from SympoApp's `hunt/registry` — this app has no registry, and
+  importing one would drag in four other puzzles.
+- `roomTasks.ts` imports `ROOM_CODE` from a room-only `codes.ts` rather than
+  SympoApp's four-code file, which keeps three other answers out of the bundle.
+
+Everything this app needs and upstream does not — the session-backed submit, the
+solved banner, the round footer — lives in `RoomRound.tsx` rather than being
+threaded through the scene code.
+
+**No 3D assets are needed.** Every prop in `manifest.ts` has `model: null`; the
+room is built entirely from procedural geometry, so there are no `.glb` files to
+copy and nothing to serve from `public/`.
+
+The room is a first-person scene: click to look, WASD to walk. Five sections,
+each opened by a word **drawn somewhere in the scene** — developed on paper, on
+an upside-down book, in a web, in a beam of light, stamped on four loose items.
+Sections open **by code, not in order**. All five open, and the room assembles
+`ARCHIVES88` from one fragment per section.
 
 ## The 64 Grid
 

@@ -56,6 +56,21 @@ export interface HuntProgressDoc {
 }
 
 /**
+ * One row per (team, circuit level).
+ *
+ * Octavius Circuit is the only round with progress BELOW the round: it is five
+ * levels, and the tile is credited when all five are cleared. `hunt_progress`
+ * has no room for that (one row per round, by design), so the per-level detail
+ * lives here and `circuit-1` is stamped in `hunt_progress` like any other round
+ * once the set is complete.
+ */
+export interface LevelProgressDoc {
+  teamNumber: number;
+  levelId: number;
+  solvedAt: Date;
+}
+
+/**
  * Thrown when MONGODB_URI is absent.
  *
  * A distinct type so routes and pages can tell "you haven't added .env.local
@@ -92,8 +107,61 @@ function clientPromise(): Promise<MongoClient> {
   globalForMongo._thClient ??= new MongoClient(uri, {
     // Fail fast rather than hanging the page for 30s on a bad URI — the
     // registration screen would rather say "can't reach the database".
-    serverSelectionTimeoutMS: 8000,
-  }).connect();
+    //
+    // This is also what decides how a DOWN database FEELS to sixty teams. Every
+    // request that touches Mongo blocks for this long before it gives up, and a
+    // browser only opens ~6 connections per origin — so with the database
+    // unreachable, a few slow tabs are enough to queue everything behind them
+    // and the site stops opening at all. Shorter means a team gets "can't reach
+    // the database" quickly instead of a page that hangs.
+    serverSelectionTimeoutMS: 5000,
+
+    /**
+     * POOL SIZING, AND WHY IT DEPENDS ON WHERE THIS IS RUNNING.
+     *
+     * These two deployments want opposite things, and getting it backwards is
+     * how a working app falls over at 60 teams.
+     *
+     * ONE LONG-LIVED SERVER (`next start`, a laptop on the venue LAN): there is
+     * exactly one pool for the whole event, so it should be generous, and
+     * keeping a few sockets warm means the first team to register after a quiet
+     * spell doesn't pay for a TLS handshake.
+     *
+     * SERVERLESS (Vercel): every function instance gets its OWN pool, and sixty
+     * teams will spread across many instances. A large floor multiplies — 20
+     * instances holding 5 idle sockets each is 100 connections doing nothing,
+     * against an Atlas M0's 500-connection ceiling, and those idle sockets are
+     * what run a free tier out of connections mid-event. So: no floor at all,
+     * and a modest cap per instance. Instances scale out; pools should not.
+     */
+    ...(process.env.VERCEL
+      ? { maxPoolSize: 10, minPoolSize: 0 }
+      : { maxPoolSize: 100, minPoolSize: 5 }),
+
+    // Don't queue forever behind an exhausted pool; surface it as an error the
+    // route can turn into a retry message.
+    waitQueueTimeoutMS: 8000,
+  })
+    .connect()
+    /**
+     * DO NOT CACHE A FAILED CONNECT.
+     *
+     * `??=` stores the promise, not the client — so a single rejection used to
+     * be remembered for the life of the process. One network blip at startup
+     * (or an Atlas IP allowlist that had not been updated yet) and EVERY later
+     * request awaited that same rejected promise and failed instantly, forever,
+     * with no way back except restarting the server. During an event that is
+     * the difference between "the database came back and so did the site" and
+     * "the site is down until someone notices and restarts it".
+     *
+     * Clearing the slot on failure means the next request builds a fresh client
+     * and tries again. Same reasoning as `ensureIndexes` below, which already
+     * did this — the connection was the one that got missed.
+     */
+    .catch((err) => {
+      globalForMongo._thClient = undefined;
+      throw err;
+    });
 
   return globalForMongo._thClient;
 }
@@ -123,6 +191,19 @@ async function ensureIndexes(): Promise<void> {
         { teamNumber: 1, challengeSlug: 1 },
         { unique: true, name: "team_challenge_unique" }
       );
+    // Octavius Circuit's per-level rows. Same reasoning as the two above: two
+    // wins posted in the same instant — a double-tap, or a team on two phones —
+    // both pass any "have they solved this yet?" read before either writes. The
+    // index makes the second insert a no-op rather than a second row carrying a
+    // later timestamp.
+    await database
+      .collection<LevelProgressDoc>("octavius_progress")
+      .createIndex({ teamNumber: 1, levelId: 1 }, { unique: true, name: "team_level_unique" });
+    // SHIFT://VERSE's seeded puzzles. Unique on teamNumber so a re-run of the
+    // seed can never leave a team with two different words.
+    await database
+      .collection("shiftverse_teams")
+      .createIndex({ teamNumber: 1 }, { unique: true, name: "teamNumber_unique" });
   })();
 
   try {
@@ -143,6 +224,33 @@ export async function teams(): Promise<Collection<TeamDoc>> {
 export async function huntProgress(): Promise<Collection<HuntProgressDoc>> {
   await ensureIndexes();
   return (await db()).collection<HuntProgressDoc>("hunt_progress");
+}
+
+/** Octavius Circuit's per-level rows. See `lib/octovius/progress.ts`. */
+export async function octaviusProgress(): Promise<Collection<LevelProgressDoc>> {
+  await ensureIndexes();
+  return (await db()).collection<LevelProgressDoc>("octavius_progress");
+}
+
+/**
+ * SHIFT://VERSE's per-team puzzle rows. See `lib/shiftverse/teams.ts`.
+ *
+ * Typed loosely here on purpose — the shape lives next to the code that uses
+ * it, and importing it back into this file would make the round's data model a
+ * dependency of the roster's.
+ */
+export async function shiftverseTeams(): Promise<
+  Collection<{
+    teamNumber: number;
+    plaintextWord: string;
+    encryptedWord: string;
+    shiftKey: number;
+    perLetterGuesses: number[];
+    startTime: number;
+  }>
+> {
+  await ensureIndexes();
+  return (await db()).collection("shiftverse_teams");
 }
 
 /* ── Registration ──────────────────────────────────────────────────────── */

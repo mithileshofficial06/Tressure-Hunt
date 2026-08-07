@@ -1,0 +1,359 @@
+/*
+ * Chrome around the game — the status strip, banners and gate screens.
+ *
+ * Deliberately small and plain CSS, not Tailwind: `game_src/style.css` is the
+ * real stylesheet here and it styles by element id. Adding a utility framework
+ * on top would mean two systems fighting over the same page for the sake of a
+ * dozen rules.
+ *
+ * Colours are lifted from the game's own palette so the strip reads as part of
+ * it rather than a browser chrome bar bolted on top.
+ */
+
+:root {
+  --oc-ink: #0b0f19;
+  --oc-paper: #ffffff;
+  --oc-cyan: #00e5ff;
+  --oc-green: #39ff14;
+  --oc-red: #ff2d6d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--oc-ink);
+  color: var(--oc-paper);
+  font-family: ui-monospace, "Courier New", monospace;
+}
+
+/* ── The round bar, and the reason the game is pushed down ──────────────────
+ *
+ * THIS FIXES A BUG THAT SHIPPED IN THE STANDALONE APP. `game_src/style.css`
+ * sets `#game-wrapper { position: fixed; inset: 0; z-index: 10 }`, plus four
+ * more full-screen fixed layers (`#bg-canvas`, `#scanline-overlay`,
+ * `#vignette-overlay`, `#logo-container`). The status strip and the footer were
+ * ordinary flow content with no stacking context of their own, so the game
+ * painted straight over both of them: on the old :3003 app the "Back to hunt"
+ * and "Finish round" buttons were sitting underneath the board, unreachable.
+ * The only way out of the round was the browser's back button.
+ *
+ * So the chrome is now one slim FIXED bar above every one of those layers, and
+ * the game's fixed layers start below it instead of at the top of the viewport.
+ * `--oc-bar-h` is the single number that keeps the two in step.
+ */
+:root {
+  --oc-bar-h: 46px;
+}
+
+.oc-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40; /* above #win-overlay's layer, so leaving always works */
+  height: var(--oc-bar-h);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  padding: 0 0.85rem;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(8px);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  overflow-x: auto;
+}
+
+/* Every full-screen layer the game pins to the viewport starts below the bar.
+   Without this the bar would overlap the game's own HUD instead of sitting
+   above it. Keep this list in step with `position: fixed` in style.css. */
+#game-wrapper,
+#bg-canvas,
+#scanline-overlay,
+#vignette-overlay,
+#logo-container {
+  top: var(--oc-bar-h) !important;
+}
+
+#game-wrapper {
+  height: calc(100dvh - var(--oc-bar-h)) !important;
+}
+
+/* The win overlay stays full-bleed — it is a celebration, and the bar sits
+   above it anyway on z-index. */
+
+/* ── Status strip (inside the bar) ──────────────────────────────────────── */
+.oc-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.oc-strip__back {
+  color: var(--oc-cyan);
+  text-decoration: none;
+}
+.oc-strip__back:hover {
+  text-decoration: underline;
+}
+
+.oc-strip__team {
+  font-weight: 700;
+  color: var(--oc-paper);
+}
+
+/* Pushed right so the level counter is always in the same place to glance at. */
+.oc-strip__count {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ── Banners ────────────────────────────────────────────────────────────── */
+/* Same problem as the bar: a banner in normal flow is painted under the game
+   and nobody ever sees the one message that matters ("that board didn't verify
+   on the server"). Pinned just below the bar instead, and centred so it reads
+   as an announcement rather than a stray line of page text. */
+.oc-banner {
+  position: fixed;
+  top: calc(var(--oc-bar-h) + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 35;
+  max-width: min(46rem, calc(100vw - 2rem));
+  padding: 0.75rem 1rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  border-left: 6px solid;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+}
+
+.oc-banner--good {
+  border-left-color: var(--oc-green);
+  background: rgba(57, 255, 20, 0.08);
+  color: var(--oc-green);
+}
+
+.oc-banner--bad {
+  border-left-color: var(--oc-red);
+  background: rgba(255, 45, 109, 0.08);
+  color: var(--oc-red);
+}
+
+.oc-banner a {
+  color: inherit;
+}
+
+.oc-banner__detail {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+/* ── Gate + loading ─────────────────────────────────────────────────────── */
+.oc-gate {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+  text-align: center;
+}
+
+.oc-gate h1 {
+  font-size: 1.5rem;
+  letter-spacing: 0.05em;
+}
+
+.oc-gate p {
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.6;
+}
+
+.oc-gate a {
+  display: inline-block;
+  margin-top: 1rem;
+  color: var(--oc-cyan);
+}
+
+.oc-loading {
+  padding: 4rem 1rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ── Round footer + finish dialogue ────────────────────────────────────────
+   Back-to-hunt / Finish-round and the summary dialogue. Skinned for this app's
+   dark chrome rather than the dashboard's Concrete palette — same behaviour,
+   different surface, because a paper-white panel over the circuit board would
+   read as a rendering fault. */
+
+/* Lives inside `.oc-bar` now, not at the bottom of a page that never scrolled.
+   `margin-left: auto` pushes Back/Finish to the right-hand end of the bar. */
+.oc-footer {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.oc-footer__hint {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.oc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.2rem;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--oc-paper);
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.oc-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+.oc-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.oc-btn--primary {
+  color: var(--oc-ink);
+  background: var(--oc-cyan);
+  border-color: var(--oc-cyan);
+}
+.oc-btn--primary:hover:not(:disabled) {
+  background: #7df3ff;
+  border-color: #7df3ff;
+}
+.oc-btn--full {
+  width: 100%;
+  margin-top: 0.6rem;
+}
+
+.oc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(4, 6, 12, 0.85);
+}
+
+.oc-dialog {
+  width: 100%;
+  max-width: 27rem;
+  padding: 1.6rem;
+  background: #10141f;
+  border: 2px solid var(--oc-cyan);
+  box-shadow: 0 0 40px -10px rgba(0, 229, 255, 0.45);
+}
+
+.oc-dialog__badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--oc-ink);
+  background: var(--oc-cyan);
+}
+
+.oc-dialog__title {
+  margin: 0.9rem 0 0;
+  font-size: 1.5rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--oc-paper);
+}
+
+.oc-dialog__points {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.oc-dialog__points strong {
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+  color: var(--oc-cyan);
+}
+
+.oc-dialog__rows {
+  margin: 1.1rem 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.oc-dialog__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.oc-dialog__row:last-child {
+  border-bottom: 0;
+}
+.oc-dialog__row dt {
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+.oc-dialog__row dd {
+  margin: 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.85);
+}
+.oc-dialog__row dd.is-strong {
+  font-weight: 700;
+  color: var(--oc-cyan);
+}
+
+.oc-dialog__muted {
+  margin-top: 1rem;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Same reason as the note in shiftverse.css: the root layout's `.grid-bg` is a
+   fixed light paper rectangle at `z-index: -1`, which has no business behind a
+   game that paints its own background. The circuit's `#bg-canvas` happens to
+   cover it, so this is belt-and-braces rather than a visible fix — but the two
+   rounds should not disagree about it. */
+.grid-bg {
+  display: none !important;
+}
