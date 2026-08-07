@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
 import CoordinatorDashboard from "../pages/CoordinatorDashboard";
+import CoordinatorGate from "./CoordinatorGate";
 import BlueprintFonts from "../BlueprintFonts";
 import { isAdminRequest } from "@/lib/admin";
 import "../blueprint.css";
@@ -23,13 +23,28 @@ export const dynamic = "force-dynamic";
  * request — so this being visible and the actions being permitted are two
  * separate checks, and neither is done by the client.
  *
- * A non-coordinator is REDIRECTED TO THE HUNT BOARD rather than shown a login.
- * A password box on a public URL invites guessing; teams reach coordinator mode
- * the one way this app has always allowed, by typing `ADMIN_CODE` into the
- * team-number box on the entry screen.
+ * ── WITHOUT THE COOKIE YOU GET A SIGN-IN, NOT A REDIRECT ──────────────────
+ * This used to `redirect("/dashboard")`, which was correct security and awful
+ * behaviour: a coordinator opening the URL landed on the TEAM board with no
+ * message, no mention of coordinator access, and no way to get in. It read as
+ * the page being broken.
+ *
+ * The board is still never rendered without the cookie — that check is the two
+ * lines below, on the server, and `/api/blueprint/coordinator` repeats it on
+ * every request. What changed is that the refusal now explains itself and
+ * offers the way through. `CoordinatorGate` posts to the hunt's existing
+ * `/api/admin/login`, so the code is checked server-side and rate-limited, and
+ * there is no second secret anywhere.
  */
 export default async function BlueprintCoordinatorPage() {
-  if (!(await isAdminRequest())) redirect("/dashboard");
+  if (!(await isAdminRequest())) {
+    return (
+      <>
+        <BlueprintFonts />
+        <CoordinatorGate />
+      </>
+    );
+  }
 
   return (
     <>

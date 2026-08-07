@@ -7,6 +7,7 @@ import {
   overrideTeamComplete,
 } from '../teamService';
 import { VARIANT_COLORS } from '../constants';
+import { formatClock } from '@/lib/format';
 
 /**
  * Screen 09: Coordinator Dashboard (09-coordinator-dashboard)
@@ -140,11 +141,17 @@ export default function CoordinatorDashboard() {
     setActionLoading((prev) => ({ ...prev, [teamNumber]: null }));
   }
 
-  // Helper to format timestamps
-  function formatTime(isoStr) {
-    if (!isoStr) return '—';
-    return new Date(isoStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  }
+  /**
+   * Timestamps, via the hunt's shared formatter.
+   *
+   * This was its own `toLocaleTimeString([], …)`, which carried the same
+   * hydration bug as the admin board: Node renders the day marker lowercase
+   * ("07:07:13 pm"), Chrome uppercase ("07:07:13 PM"), and this board is
+   * server-rendered before it hydrates. Using the shared function fixes it here
+   * too and means the two coordinator screens cannot disagree about what time
+   * something happened.
+   */
+  const formatTime = (isoStr) => formatClock(isoStr ?? null);
 
   // Helper to calculate duration
   function formatDuration(startTime, completeTime) {
@@ -202,15 +209,21 @@ export default function CoordinatorDashboard() {
             COORDINATOR DASHBOARD
           </span>
         </div>
-        <button
-          onClick={() => {
-            sessionStorage.removeItem('coord_token');
-            setAuthToken('');
-          }}
-          className="font-['Space_Mono'] text-xs text-[#ffb4ab] hover:underline"
+        {/* WAS A BROKEN BUTTON. It cleared `sessionStorage.coord_token` and
+            called `setAuthToken('')` — both of which stopped existing when this
+            round's password gate was replaced by the dashboard's admin cookie.
+            Clicking it threw `setAuthToken is not defined` and did nothing else.
+
+            "Log out" is also the wrong idea now: the admin cookie is shared with
+            the hunt's own admin board, so dropping it here would sign a
+            coordinator out of everything mid-event. This goes BACK instead —
+            and to sign out properly there is "Exit admin" on that board. */}
+        <a
+          href="/admin"
+          className="font-['Space_Mono'] text-xs text-[#00fbfb] hover:underline"
         >
-          [ LOGOUT ]
-        </button>
+          [ ← ADMIN BOARD ]
+        </a>
       </header>
 
       {/* Main Table */}

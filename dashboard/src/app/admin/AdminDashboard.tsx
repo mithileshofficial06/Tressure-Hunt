@@ -255,6 +255,15 @@ export default function AdminDashboard({
             <h1 className="display mt-4 text-4xl text-ink sm:text-5xl">Admin Board</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {/* Blueprint Recovery is the one round a coordinator has to WORK
+                during: a team walks to a physical sector, presses "notify", and
+                sits at `awaiting_reveal` until someone here releases their
+                location. Its board had no link from anywhere when the round was
+                folded in — it lives at a URL you would have had to know — so
+                this is the door. Same admin cookie, so it opens straight in. */}
+            <a href="/rounds/blueprint/coordinator" className="btn">
+              Blueprint reveals →
+            </a>
             <button onClick={() => void refresh()} className="btn">
               Refresh
             </button>
